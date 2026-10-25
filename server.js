@@ -19,6 +19,8 @@ const MIME = {
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.json': 'application/json; charset=utf-8',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
 };
 
 admin.init();
@@ -74,6 +76,9 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`[xpanel] listening on http://${HOST}:${PORT}`);
+  const logs = require('./src/logs');
+  logs.prune();
+  setInterval(() => logs.prune(), 24 * 3600 * 1000).unref();
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {

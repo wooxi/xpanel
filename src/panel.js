@@ -1,12 +1,37 @@
 'use strict';
 
+const zlib = require('node:zlib');
 const { db, now, getSetting } = require('./db');
 const L = require('./lib');
 const sub = require('./subscribe');
+const logs = require('./logs');
 
 /** uid -> Map(ip -> 最后上报时间) */
 const aliveMap = new Map();
 const ALIVE_TTL = 10 * 60;
+
+/** nodeId -> 上次写「同步」日志的时间戳，用于给 nodex 轮询去重 */
+const syncLogAt = new Map();
+const SYNC_LOG_GAP = 10 * 60;
+
+function clientIp(req) {
+  const xf = String((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim();
+  return xf || (req.socket && req.socket.remoteAddress) || '';
+}
+
+function logNodeSync(node, req) {
+  const t = now();
+  if (t - (syncLogAt.get(node.id) || 0) < SYNC_LOG_GAP) return;
+  syncLogAt.set(node.id, t);
+  logs.add({
+    level: 'info',
+    source: 'node',
+    action: 'sync',
+    message: `节点「${node.name}」拉取配置`,
+    meta: { node_id: node.id, type: node.type, host: node.host, port: node.port },
+    ip: clientIp(req),
+  });
+}
 
 function aliveOf(uid) {
   const m = aliveMap.get(uid);
@@ -129,6 +154,7 @@ async function handle(req, res, url) {
   if (req.method === 'GET' && action === 'config') {
     node.last_report_at = now();
     db.prepare('UPDATE nodes SET last_report_at = ? WHERE id = ?').run(node.last_report_at, node.id);
+    logNodeSync(node, req);
     json(res, 200, buildNodeConfig(node));
     return true;
   }
@@ -155,7 +181,7 @@ async function handle(req, res, url) {
       `INSERT INTO traffic_daily (uid, node_id, day, up, down) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(uid, node_id, day) DO UPDATE SET up = up + excluded.up, down = down + excluded.down`
     );
-    const day = new Date().toISOString().slice(0, 10);
+    const day = L.localDay();
     const ts = now();
 
     const tx = db.transaction((rows) => {
@@ -208,12 +234,16 @@ async function handle(req, res, url) {
 }
 
 function sendRaw(res, status, contentType, body, extra = {}) {
-  const buf = Buffer.isBuffer(body) ? body : Buffer.from(body, 'utf8');
-  res.writeHead(status, {
-    'content-type': contentType,
-    'content-length': buf.length,
-    ...extra,
-  });
+  let buf = Buffer.isBuffer(body) ? body : Buffer.from(body, 'utf8');
+  const headers = { 'content-type': contentType, ...extra };
+  const ae = String((res.req && res.req.headers['accept-encoding']) || '');
+  if (buf.length >= 1024 && /\bgzip\b/.test(ae)) {
+    buf = zlib.gzipSync(buf);
+    headers['content-encoding'] = 'gzip';
+    headers.vary = 'Accept-Encoding';
+  }
+  headers['content-length'] = buf.length;
+  res.writeHead(status, headers);
   res.end(buf);
 }
 
@@ -227,6 +257,21 @@ function handleSubscribe(req, res, url) {
     const flag = (url.searchParams.get('flag') || '').toLowerCase();
     const format = ['clash', 'rocket', 'general'].includes(flag) ? flag : L.detectFormat(req.headers['user-agent']);
     const nodes = L.isActive(user) ? sub.activeNodes(user.id) : [];
+    logs.add({
+      level: L.isActive(user) ? 'info' : 'warn',
+      source: 'sub',
+      action: 'subscribe',
+      message: L.isActive(user)
+        ? `${user.name} 获取订阅`
+        : `${user.name} 获取订阅被拒：${sub.unavailableReason(user)}`,
+      meta: {
+        uid: user.id,
+        format,
+        nodes: nodes.length,
+        ua: String(req.headers['user-agent'] || '').slice(0, 120),
+      },
+      ip: clientIp(req),
+    });
     const headers = {
       'profile-update-interval': '12',
       'subscription-userinfo': L.userInfoHeader(user),

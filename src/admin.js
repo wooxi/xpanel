@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const { db, now, getSetting, setSetting, getAllSettings } = require('./db');
 const L = require('./lib');
+const logs = require('./logs');
 
 const SESSION_TTL = 7 * 24 * 3600;
 const COOKIE = 'xp_sid';
@@ -202,9 +203,17 @@ async function handle(req, res, url) {
       verifyPassword(str(data.password), getSetting('admin_pass', ''));
     if (!ok) {
       noteLoginFail(ip);
+      logs.add({ level: 'warn', source: 'auth', action: 'login', message: '登录失败：账号或密码错误', ip });
       return json(res, 401, { error: '账号或密码错误' }), true;
     }
     const sid = createSession();
+    logs.add({
+      level: 'info',
+      source: 'auth',
+      action: 'login',
+      message: `管理员 ${str(data.username)} 登录成功`,
+      ip,
+    });
     return json(
       res,
       200,
@@ -226,12 +235,27 @@ async function handle(req, res, url) {
     return json(res, 200, { user: admin, base: baseUrl(req) }), true;
   }
 
+  if (path === '/api/logs' && req.method === 'GET') {
+    const p = url.searchParams;
+    return json(
+      res,
+      200,
+      logs.query({
+        limit: p.get('limit'),
+        offset: p.get('offset'),
+        source: p.get('source') || '',
+        level: p.get('level') || '',
+        q: p.get('q') || '',
+      })
+    ), true;
+  }
+
   if (path === '/api/overview' && req.method === 'GET') {
     const nodes = db.prepare('SELECT COUNT(*) c FROM nodes').get().c;
     const nodesOn = db.prepare('SELECT COUNT(*) c FROM nodes WHERE enabled = 1').get().c;
     const users = db.prepare('SELECT COUNT(*) c FROM users').get().c;
     const u = db.prepare('SELECT COALESCE(SUM(up + down), 0) s FROM users').get().s;
-    const day = new Date().toISOString().slice(0, 10);
+    const day = L.localDay();
     const today = db.prepare('SELECT COALESCE(SUM(up + down), 0) s FROM traffic_daily WHERE day = ?').get(day).s;
     const activeUsers = db
       .prepare(
@@ -240,6 +264,15 @@ async function handle(req, res, url) {
            AND (traffic_limit IS NULL OR up + down < traffic_limit)`
       )
       .get(now()).c;
+    /* 最近 7 天（含今日）的日流量，用于仪表盘趋势图 */
+    const days = [];
+    for (let i = 6; i >= 0; i -= 1) days.push(L.localDay(Date.now() - i * 86400000));
+    const daily = new Map(
+      db
+        .prepare('SELECT day, SUM(up + down) s FROM traffic_daily WHERE day >= ? GROUP BY day')
+        .all(days[0])
+        .map((r) => [r.day, r.s])
+    );
     return json(res, 200, {
       nodes,
       nodes_enabled: nodesOn,
@@ -247,6 +280,7 @@ async function handle(req, res, url) {
       users_active: activeUsers,
       traffic_total: u,
       traffic_today: today,
+      trend: days.map((d) => ({ day: d, total: daily.get(d) || 0 })),
     }), true;
   }
 
@@ -418,6 +452,24 @@ async function handle(req, res, url) {
     return json(res, 200, { ok: true }), true;
   }
 
+  if (path === '/api/password' && req.method === 'POST') {
+    const ip = req.socket.remoteAddress || 'unknown';
+    const d = await body(req);
+    const cur = str(d.current);
+    const next = str(d.next);
+    if (!verifyPassword(cur, getSetting('admin_pass', ''))) {
+      logs.add({ level: 'warn', source: 'auth', action: 'password', message: '修改密码失败：当前密码错误', ip });
+      return json(res, 400, { error: '当前密码不正确' }), true;
+    }
+    if (next.length < 8) return json(res, 400, { error: '新密码至少 8 位字符' }), true;
+    if (next === cur) return json(res, 400, { error: '新密码不能与当前密码相同' }), true;
+    setSetting('admin_pass', hashPassword(next));
+    const sid = parseCookies(req)[COOKIE];
+    db.prepare('DELETE FROM sessions WHERE token <> ?').run(sid || '');
+    logs.add({ level: 'info', source: 'auth', action: 'password', message: '管理员密码已修改，其他会话已失效', ip });
+    return json(res, 200, { ok: true }), true;
+  }
+
   if (path === '/api/template' && req.method === 'GET') {
     const custom = getSetting('clash_template', '');
     const isDefault = !custom.trim();
@@ -428,6 +480,34 @@ async function handle(req, res, url) {
     const d = await body(req);
     setSetting('clash_template', String(d.content ?? ''));
     return json(res, 200, { ok: true }), true;
+  }
+
+  /* 用「尚未保存」的模板内容 + 当前节点渲染一份真实配置，供编辑器预览校验 */
+  if (path === '/api/template/preview' && req.method === 'POST') {
+    const d = await body(req);
+    const content = String(d.content ?? '');
+    if (!content.trim()) return json(res, 400, { error: '模板为空' }), true;
+
+    const sub = require('./subscribe');
+    const uid = Number(d.user_id) || 0;
+    const user = uid
+      ? db.prepare('SELECT * FROM users WHERE id = ?').get(uid)
+      : db.prepare('SELECT * FROM users ORDER BY id ASC LIMIT 1').get();
+    if (!user) return json(res, 400, { error: '还没有用户，先创建一个用户再预览' }), true;
+
+    const nodes = sub.activeNodes(user.id);
+    let text;
+    try {
+      text = sub.renderClash(user, nodes, content);
+    } catch (e) {
+      return json(res, 500, { error: `渲染失败：${e.message}` }), true;
+    }
+    return json(res, 200, {
+      content: text,
+      lines: text.split('\n').length,
+      nodes: nodes.length,
+      user: user.name,
+    }), true;
   }
 
   return json(res, 404, { error: 'not found' }), true;

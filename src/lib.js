@@ -132,6 +132,13 @@ function isActive(user) {
   return !user.banned && !isExpired(user) && !isOverLimit(user);
 }
 
+/** 本地时区的 YYYY-MM-DD，避免用 UTC 记账导致跨日错位 */
+function localDay(ts = Date.now()) {
+  const d = new Date(ts);
+  const shifted = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return shifted.toISOString().slice(0, 10);
+}
+
 module.exports = {
   GB,
   fmtSize,
@@ -150,4 +157,5 @@ module.exports = {
   isExpired,
   isOverLimit,
   isActive,
+  localDay,
 };

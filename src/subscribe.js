@@ -51,15 +51,18 @@ function appName(user) {
   return getSetting('sub_name', '') || user.name || 'xpanel';
 }
 
-function renderClash(user, nodes) {
-  const tpl = loadTemplate();
+function renderClash(user, nodes, tplOverride) {
+  const tpl = tplOverride == null ? loadTemplate() : String(tplOverride);
   const list = nodes.map((n) => nodeYaml(user, n)).join('\n');
   const proxies = list || placeholderNode(unavailableReason(user));
   // 把「自动选择 / 故障转移」这类空策略组填上节点
   const names = nodes.map((n) => L.yq(n.name)).join(', ');
   const groupFill = names ? `proxies: [${names}]` : 'proxies: []';
+  // 主选择组：策略组 + DIRECT + 全部节点，可直接手动选到具体节点
+  const members = ['"自动选择"', '"故障转移"', '"DIRECT"', ...nodes.map((n) => L.yq(n.name))].join(', ');
   return tpl
     .replace('{{PROXIES}}', proxies)
+    .replace('{{GROUP_MEMBERS}}', members)
     .replaceAll('{{APP_NAME}}', appName(user))
     .replaceAll('proxies: []', groupFill);
 }

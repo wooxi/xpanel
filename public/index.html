@@ -2,141 +2,363 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>xpanel · Hysteria2 面板</title>
-  <link rel="stylesheet" href="/style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%235b6cff'/><stop offset='1' stop-color='%23a855f7'/></linearGradient></defs><rect width='32' height='32' rx='9' fill='url(%23g)'/><path d='M17.5 6 9 18h6l-1.5 8L22 14h-6z' fill='white'/></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <title>xpanel · Hysteria2 控制台</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+  <link rel="stylesheet" href="/style.css?v=3.1.0" />
 </head>
-<body>
-  <!-- 登录 -->
-  <div class="login-wrap" id="login">
-    <div class="aurora" aria-hidden="true"></div>
-    <form class="login-card" id="login-form">
-      <div class="logo">⚡</div>
-      <h1>xpanel</h1>
-      <p>Hysteria2 节点与订阅管理</p>
-      <label class="field"><span>账号</span><input type="text" id="login-user" autocomplete="username" required /></label>
-      <label class="field"><span>密码</span><input type="password" id="login-pass" autocomplete="current-password" required /></label>
-      <button class="btn primary block" type="submit">登录</button>
-      <div class="hint err" id="login-error"></div>
+<body class="booting">
+
+<!-- ══════════════ 登录 ══════════════ -->
+<div class="auth" id="login" hidden>
+  <div class="auth-panel">
+    <div class="auth-brand">
+      <span class="mark"><span class="mark-x">x</span></span>
+      <span class="auth-brand-text">xpanel</span>
+    </div>
+
+    <h1>登录控制台</h1>
+
+    <form id="login-form" autocomplete="on">
+      <label class="field">
+        <span class="field-label">管理员账号</span>
+        <input type="text" id="login-user" autocomplete="username" required placeholder="admin" />
+      </label>
+      <label class="field">
+        <span class="field-label">密码</span>
+        <input type="password" id="login-pass" autocomplete="current-password" required placeholder="••••••••••" />
+      </label>
+      <div class="auth-error" id="login-error"></div>
+      <button class="btn btn-primary btn-block btn-lg" type="submit">进入控制台</button>
     </form>
   </div>
+</div>
 
-  <!-- 主体 -->
-  <div id="app" hidden>
+<!-- ══════════════ 主体 ══════════════ -->
+<div class="shell" id="app" hidden>
+
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span class="mark mark-sm"><span class="mark-x">x</span></span>
+      <div class="sidebar-title">
+        <strong>xpanel</strong>
+        <span>Hysteria2</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">概览</div>
+      <a class="nav-item" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.2" width="8" height="10.5" rx="2"/><rect x="13.6" y="3.2" width="7.2" height="6" rx="2"/><rect x="13.6" y="11.6" width="7.2" height="9.2" rx="2"/><rect x="3.2" y="16.1" width="8" height="4.7" rx="2"/></svg>
+        <span>仪表盘</span>
+      </a>
+
+      <div class="nav-label">资源</div>
+      <a class="nav-item" data-view="nodes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6.4" rx="2.2"/><rect x="3" y="13.6" width="18" height="6.4" rx="2.2"/><path d="M6.6 7.2h.01M9.8 7.2h.01M6.6 16.8h.01M9.8 16.8h.01"/><path d="M16.4 7.2h1.6M16.4 16.8h1.6"/></svg>
+        <span>节点</span>
+        <em class="nav-count" id="nav-node-count"></em>
+      </a>
+      <a class="nav-item" data-view="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.9"/><path d="M4.9 20.4c0-3.55 3.18-5.9 7.1-5.9s7.1 2.35 7.1 5.9"/></svg>
+        <span>用户</span>
+        <em class="nav-count" id="nav-user-count"></em>
+      </a>
+
+      <div class="nav-label">系统</div>
+      <a class="nav-item" data-view="logs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 3.6H7.2a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h9.6a2 2 0 0 0 2-2V8.8z"/><path d="M13.6 3.6V8.8H18.8"/><path d="M8.7 12.4h6.6M8.7 16h4.3"/></svg>
+        <span>日志</span>
+      </a>
+      <a class="nav-item" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h4.5M12.7 7.4h7.3"/><path d="M4 16.6h9.3M17.5 16.6h2.5"/><circle cx="10.6" cy="7.4" r="2.1"/><circle cx="15.4" cy="16.6" r="2.1"/></svg>
+        <span>设置</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="health">
+        <span class="dot-ok"></span>
+        <div>
+          <b>面板运行中</b>
+          <small>v3.0.0</small>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
     <header class="topbar">
-      <div class="brand"><span class="logo sm">⚡</span><b>xpanel</b><small>Hysteria2</small></div>
-      <div class="spacer"></div>
-      <span class="who"><i class="dot"></i><span id="who"></span></span>
-      <button class="btn ghost sm" id="logout">退出</button>
+      <div class="topbar-title">
+        <h1 id="page-title">仪表盘</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="btn-refresh" title="刷新数据">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3.5V9h-5.5"/></svg>
+        </button>
+        <div class="user-wrap">
+          <button class="user-chip" id="user-chip" type="button">
+            <span class="avatar" id="who-avatar">A</span>
+            <span class="user-chip-text">
+              <b id="who">admin</b>
+              <small>管理员</small>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5 12 15l5.5-5.5"/></svg>
+          </button>
+          <div class="user-menu" id="user-menu" hidden>
+            <button type="button" class="menu-item" data-act="password">修改密码</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-item is-danger" data-act="logout">退出登录</button>
+          </div>
+        </div>
+      </div>
     </header>
 
-    <div class="layout">
-      <nav class="side">
-        <button data-view="dashboard" class="active">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>
-          <span>仪表盘</span>
-        </button>
-        <button data-view="nodes">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="19" height="7" rx="2.2"/><rect x="2.5" y="14" width="19" height="7" rx="2.2"/><path d="M6 6.5h.01M6 17.5h.01"/></svg>
-          <span>节点</span>
-        </button>
-        <button data-view="users">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-1.8a3.6 3.6 0 0 0-3.6-3.6H6.6A3.6 3.6 0 0 0 3 19.2V21"/><circle cx="9.5" cy="7.5" r="3.6"/><path d="M21 21v-1.8a3.6 3.6 0 0 0-2.7-3.48"/><path d="M15.5 4.1a3.6 3.6 0 0 1 0 6.8"/></svg>
-          <span>用户</span>
-        </button>
-        <button data-view="settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-6M4 11V3M12 21v-9M12 8V3M20 21v-4M20 13V3"/><path d="M1.5 15h5M9.5 8h5M17.5 17h5"/></svg>
-          <span>设置</span>
-        </button>
-        <div class="side-foot"><span class="ver">v0.1.0</span></div>
-      </nav>
+    <main class="main">
 
-      <main class="main">
-        <section id="view-dashboard" class="view">
-          <h2 class="page-title">概览</h2>
-          <div class="cards" id="cards"></div>
-          <div class="panel">
-            <div class="panel-head"><h3>节点状态</h3></div>
-            <div id="dash-nodes"></div>
-          </div>
-        </section>
+      <!-- ────────── 仪表盘 ────────── -->
+      <section id="view-dashboard" class="view">
+        <div class="kpi-grid" id="cards"></div>
 
-        <section id="view-nodes" class="view" hidden>
-          <h2 class="page-title">节点</h2>
+        <div class="dash-grid">
           <div class="panel">
             <div class="panel-head">
-              <h3>HY2 节点</h3>
-              <div class="spacer"></div>
-              <button class="btn primary" id="add-node">添加节点</button>
+              <div class="panel-head-text">
+                <h2>节点状态</h2>
+              </div>
+              <a class="link-arrow" data-jump="nodes">管理节点 →</a>
             </div>
-            <div id="node-list"></div>
+            <div id="dash-nodes" class="list-body"></div>
           </div>
-        </section>
 
-        <section id="view-users" class="view" hidden>
-          <h2 class="page-title">用户</h2>
           <div class="panel">
             <div class="panel-head">
-              <h3>用户与订阅</h3>
-              <div class="spacer"></div>
-              <button class="btn primary" id="add-user">添加用户</button>
+              <div class="panel-head-text">
+                <h2>流量消耗</h2>
+              </div>
+              <a class="link-arrow" data-jump="users">全部用户 →</a>
             </div>
-            <div id="user-list"></div>
+            <div class="mini-stats" id="dash-stats"></div>
+            <div id="dash-users" class="list-body"></div>
           </div>
-        </section>
+        </div>
 
-        <section id="view-settings" class="view" hidden>
-          <h2 class="page-title">设置</h2>
-          <div class="split">
-            <div class="panel">
-              <div class="panel-head"><h3>基础设置</h3></div>
-              <div class="panel-body">
-                <label class="field"><span>面板公开地址</span>
-                  <input type="text" id="set-panel-url" placeholder="https://sub.example.com" />
-                  <div class="hint">用于生成订阅链接，留空则按浏览器地址自动判断</div>
-                </label>
-                <label class="field"><span>订阅显示名</span>
-                  <input type="text" id="set-sub-name" placeholder="我的节点" />
-                  <div class="hint">Clash 配置里策略组的名字，也是订阅名称</div>
-                </label>
-                <div class="row2">
-                  <label class="field"><span>节点拉取间隔（秒）</span><input type="number" id="set-pull" min="30" /></label>
-                  <label class="field"><span>流量上报间隔（秒）</span><input type="number" id="set-push" min="30" /></label>
-                </div>
-                <button class="btn primary" id="save-settings">保存</button>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-head-text">
+              <h2>近 7 天流量</h2>
+            </div>
+            <span class="tag" id="trend-sum">—</span>
+          </div>
+          <div class="panel-body">
+            <div id="trend-chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────── 节点 ────────── -->
+      <section id="view-nodes" class="view" hidden>
+        <div class="toolbar">
+          <div class="toolbar-text">
+            <span id="node-summary" class="summary-badge">—</span>
+          </div>
+          <div class="toolbar-actions">
+            <button class="btn btn-primary" id="add-node">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              添加节点
+            </button>
+          </div>
+        </div>
+        <div id="node-list" class="node-grid"></div>
+      </section>
+
+      <!-- ────────── 用户 ────────── -->
+      <section id="view-users" class="view" hidden>
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+            <input type="text" id="user-search" placeholder="搜索用户名或 UUID" />
+          </div>
+          <div class="toolbar-actions">
+            <div class="seg" id="user-filter">
+              <button class="seg-item active" data-filter="all">全部</button>
+              <button class="seg-item" data-filter="active">正常</button>
+              <button class="seg-item" data-filter="expired">异常</button>
+            </div>
+            <button class="btn btn-primary" id="add-user">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              添加用户
+            </button>
+          </div>
+        </div>
+        <div class="panel">
+          <div id="user-list"></div>
+        </div>
+      </section>
+
+      <!-- ────────── 日志 ────────── -->
+      <section id="view-logs" class="view" hidden>
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+            <input type="text" id="log-search" placeholder="搜索日志" />
+          </div>
+          <div class="toolbar-actions">
+            <div class="seg" id="log-filter">
+              <button class="seg-item active" data-src="">全部</button>
+              <button class="seg-item" data-src="auth">登录</button>
+              <button class="seg-item" data-src="sub">订阅</button>
+              <button class="seg-item" data-src="node">节点</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="log-table" id="log-list"></div>
+          <div class="log-foot" id="log-foot" hidden>
+            <button class="btn btn-ghost" id="log-more">加载更多</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────── 设置 ────────── -->
+      <section id="view-settings" class="view" hidden>
+
+        <div class="settings-grid">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-head-text">
+                <h2>基础设置</h2>
               </div>
             </div>
-
-            <div class="panel">
-              <div class="panel-head">
-                <h3>Clash 模板</h3>
-                <div class="spacer"></div>
-                <button class="btn sm" id="reset-template">恢复默认</button>
+            <div class="panel-body form-narrow">
+              <label class="field">
+                <span class="field-label">面板公开地址</span>
+                <input type="text" id="set-panel-url" placeholder="https://sub.example.com" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span class="field-label">订阅显示名</span>
+                <input type="text" id="set-sub-name" placeholder="我的节点" />
+              </label>
+              <div class="field-row">
+                <label class="field">
+                  <span class="field-label">节点拉取间隔</span>
+                  <div class="input-suffix">
+                    <input type="number" id="set-pull" min="30" />
+                    <span>秒</span>
+                  </div>
+                </label>
+                <label class="field">
+                  <span class="field-label">流量上报间隔</span>
+                  <div class="input-suffix">
+                    <input type="number" id="set-push" min="30" />
+                    <span>秒</span>
+                  </div>
+                </label>
               </div>
-              <div class="panel-body">
-                <div class="hint" id="template-note" style="margin-bottom:8px">
-                  必须包含 <code>{{PROXIES}}</code>（节点插入位置）与 <code>{{APP_NAME}}</code>（订阅名）。
-                </div>
-                <textarea id="set-template" spellcheck="false"></textarea>
-                <button class="btn primary" id="save-template">保存模板</button>
+              <div class="form-actions">
+                <button class="btn btn-primary" id="save-settings">保存设置</button>
               </div>
             </div>
           </div>
-        </section>
-      </main>
-    </div>
-  </div>
 
-  <div class="modal" id="modal" hidden>
-    <div class="modal-card">
-      <div class="modal-head" id="modal-title"></div>
-      <div class="modal-body" id="modal-body"></div>
-      <div class="modal-foot" id="modal-foot"></div>
-    </div>
-  </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-head-text">
+                <h2>订阅对接</h2>
+              </div>
+            </div>
+            <div class="panel-body">
+              <dl class="kv">
+                <dt>订阅入口</dt>
+                <dd class="mono" id="kv-sub-entry">—</dd>
+                <dt>自动识别</dt>
+                <dd><code>User-Agent</code></dd>
+                <dt>强制格式</dt>
+                <dd class="mono">?flag=clash · rocket · general</dd>
+                <dt>心跳上报</dt>
+                <dd class="mono">POST /api/v1/server/UniProxy</dd>
+              </dl>
 
-  <div id="toast"></div>
-  <script src="/app.js"></script>
+              <div class="kv-split"></div>
+              <dl class="kv kv-tight">
+                <dt>已接管节点</dt>
+                <dd id="kv-node-count">—</dd>
+                <dt>有效用户</dt>
+                <dd id="kv-user-count">—</dd>
+                <dt>模板来源</dt>
+                <dd id="kv-tpl-source">—</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <!-- 模板编辑器 -->
+        <div class="panel template-panel">
+          <div class="panel-head">
+            <div class="panel-head-text">
+              <h2>Clash 订阅模板</h2>
+            </div>
+            <div class="panel-head-actions">
+              <span class="tag" id="tpl-badge">内置默认</span>
+              <button class="btn btn-sm" id="reset-template">恢复默认</button>
+            </div>
+          </div>
+
+          <div class="tpl-toolbar">
+            <div class="tpl-nav" id="tpl-sections">
+              <button type="button" class="tpl-sec-btn active" data-sec="all">完整模板</button>
+              <button type="button" class="tpl-sec-btn" data-sec="dns">DNS</button>
+              <button type="button" class="tpl-sec-btn" data-sec="proxy-groups">策略组</button>
+              <button type="button" class="tpl-sec-btn" data-sec="rules">规则</button>
+            </div>
+            <div class="tpl-toolbar-right">
+              <span class="tpl-stat" id="tpl-stat">0 行</span>
+              <button type="button" class="btn btn-sm" id="tpl-preview">预览</button>
+              <button type="button" class="btn btn-sm" id="tpl-format">格式化</button>
+              <button type="button" class="btn btn-primary btn-sm" id="save-template">保存模板</button>
+            </div>
+          </div>
+
+          <div class="tpl-editor">
+            <div class="tpl-gutter" id="tpl-linenos" aria-hidden="true"></div>
+            <div class="tpl-stage">
+              <pre class="tpl-highlight" id="tpl-highlight" aria-hidden="true"></pre>
+              <textarea id="set-template" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" wrap="off"></textarea>
+            </div>
+          </div>
+
+          <div class="tpl-footer">
+            <div class="tpl-vars-inline">
+              <span class="tpl-vars-label">可用变量</span>
+              <button type="button" class="var-chip" data-var="{{PROXIES}}" title="点击插入">PROXIES</button>
+              <button type="button" class="var-chip" data-var="{{APP_NAME}}" title="点击插入">APP_NAME</button>
+              <button type="button" class="var-chip" data-var="{{GROUP_MEMBERS}}" title="策略组与全部节点，供主选择组使用">GROUP_MEMBERS</button>
+            </div>
+            <span class="tpl-warn" id="tpl-warn"></span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════ 弹窗 ══════════════ -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h3 id="modal-title"></h3>
+      <button class="icon-btn" id="modal-close" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/app.js?v=3.1.0"></script>
 </body>
 </html>

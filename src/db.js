@@ -76,9 +76,22 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS logs (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts      INTEGER NOT NULL,
+  level   TEXT    NOT NULL DEFAULT 'info',
+  source  TEXT    NOT NULL,
+  action  TEXT    NOT NULL,
+  message TEXT    NOT NULL,
+  meta    TEXT,
+  ip      TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_traffic_day ON traffic_daily(day);
 CREATE INDEX IF NOT EXISTS idx_users_sub ON users(sub_token);
 CREATE INDEX IF NOT EXISTS idx_nodes_token ON nodes(token);
+CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(ts DESC);
+CREATE INDEX IF NOT EXISTS idx_logs_source ON logs(source);
 `);
 
 const now = () => Math.floor(Date.now() / 1000);
