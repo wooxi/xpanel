@@ -107,4 +107,4 @@ docker compose exec xpanel sh -c 'sqlite3 /data/xpanel.db ".backup /data/backup.
 
 ## 许可
 
-待补充。
+本项目采用 MIT 许可证，见 [LICENSE](LICENSE)。

@@ -107,4 +107,4 @@ Copy `-wal` and `-shm` along with the database, or stop the container first. Whe
 
 ## License
 
-To be added.
+MIT — see [LICENSE](LICENSE).
