@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xpanel · Hysteria2 面板</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%235b6cff'/><stop offset='1' stop-color='%23a855f7'/></linearGradient></defs><rect width='32' height='32' rx='9' fill='url(%23g)'/><path d='M17.5 6 9 18h6l-1.5 8L22 14h-6z' fill='white'/></svg>" />
+</head>
+<body>
+  <!-- 登录 -->
+  <div class="login-wrap" id="login">
+    <div class="aurora" aria-hidden="true"></div>
+    <form class="login-card" id="login-form">
+      <div class="logo">⚡</div>
+      <h1>xpanel</h1>
+      <p>Hysteria2 节点与订阅管理</p>
+      <label class="field"><span>账号</span><input type="text" id="login-user" autocomplete="username" required /></label>
+      <label class="field"><span>密码</span><input type="password" id="login-pass" autocomplete="current-password" required /></label>
+      <button class="btn primary block" type="submit">登录</button>
+      <div class="hint err" id="login-error"></div>
+    </form>
+  </div>
+
+  <!-- 主体 -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><span class="logo sm">⚡</span><b>xpanel</b><small>Hysteria2</small></div>
+      <div class="spacer"></div>
+      <span class="who"><i class="dot"></i><span id="who"></span></span>
+      <button class="btn ghost sm" id="logout">退出</button>
+    </header>
+
+    <div class="layout">
+      <nav class="side">
+        <button data-view="dashboard" class="active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>
+          <span>仪表盘</span>
+        </button>
+        <button data-view="nodes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="19" height="7" rx="2.2"/><rect x="2.5" y="14" width="19" height="7" rx="2.2"/><path d="M6 6.5h.01M6 17.5h.01"/></svg>
+          <span>节点</span>
+        </button>
+        <button data-view="users">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-1.8a3.6 3.6 0 0 0-3.6-3.6H6.6A3.6 3.6 0 0 0 3 19.2V21"/><circle cx="9.5" cy="7.5" r="3.6"/><path d="M21 21v-1.8a3.6 3.6 0 0 0-2.7-3.48"/><path d="M15.5 4.1a3.6 3.6 0 0 1 0 6.8"/></svg>
+          <span>用户</span>
+        </button>
+        <button data-view="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-6M4 11V3M12 21v-9M12 8V3M20 21v-4M20 13V3"/><path d="M1.5 15h5M9.5 8h5M17.5 17h5"/></svg>
+          <span>设置</span>
+        </button>
+        <div class="side-foot"><span class="ver">v0.1.0</span></div>
+      </nav>
+
+      <main class="main">
+        <section id="view-dashboard" class="view">
+          <h2 class="page-title">概览</h2>
+          <div class="cards" id="cards"></div>
+          <div class="panel">
+            <div class="panel-head"><h3>节点状态</h3></div>
+            <div id="dash-nodes"></div>
+          </div>
+        </section>
+
+        <section id="view-nodes" class="view" hidden>
+          <h2 class="page-title">节点</h2>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>HY2 节点</h3>
+              <div class="spacer"></div>
+              <button class="btn primary" id="add-node">添加节点</button>
+            </div>
+            <div id="node-list"></div>
+          </div>
+        </section>
+
+        <section id="view-users" class="view" hidden>
+          <h2 class="page-title">用户</h2>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>用户与订阅</h3>
+              <div class="spacer"></div>
+              <button class="btn primary" id="add-user">添加用户</button>
+            </div>
+            <div id="user-list"></div>
+          </div>
+        </section>
+
+        <section id="view-settings" class="view" hidden>
+          <h2 class="page-title">设置</h2>
+          <div class="split">
+            <div class="panel">
+              <div class="panel-head"><h3>基础设置</h3></div>
+              <div class="panel-body">
+                <label class="field"><span>面板公开地址</span>
+                  <input type="text" id="set-panel-url" placeholder="https://sub.example.com" />
+                  <div class="hint">用于生成订阅链接，留空则按浏览器地址自动判断</div>
+                </label>
+                <label class="field"><span>订阅显示名</span>
+                  <input type="text" id="set-sub-name" placeholder="我的节点" />
+                  <div class="hint">Clash 配置里策略组的名字，也是订阅名称</div>
+                </label>
+                <div class="row2">
+                  <label class="field"><span>节点拉取间隔（秒）</span><input type="number" id="set-pull" min="30" /></label>
+                  <label class="field"><span>流量上报间隔（秒）</span><input type="number" id="set-push" min="30" /></label>
+                </div>
+                <button class="btn primary" id="save-settings">保存</button>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Clash 模板</h3>
+                <div class="spacer"></div>
+                <button class="btn sm" id="reset-template">恢复默认</button>
+              </div>
+              <div class="panel-body">
+                <div class="hint" id="template-note" style="margin-bottom:8px">
+                  必须包含 <code>{{PROXIES}}</code>（节点插入位置）与 <code>{{APP_NAME}}</code>（订阅名）。
+                </div>
+                <textarea id="set-template" spellcheck="false"></textarea>
+                <button class="btn primary" id="save-template">保存模板</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head" id="modal-title"></div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-foot" id="modal-foot"></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

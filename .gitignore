@@ -1,0 +1,5 @@
+*.log
+.env
+DELIVERY.md
+data
+node_modules

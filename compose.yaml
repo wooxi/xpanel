@@ -1,0 +1,22 @@
+services:
+  xpanel:
+    build: .
+    image: xpanel:0.1.0
+    container_name: xpanel
+    restart: unless-stopped
+    init: true
+    ports:
+      - "7002:7002"
+    environment:
+      TZ: Asia/Shanghai
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASS: ${ADMIN_PASS:?请在 .env 设置 ADMIN_PASS}
+    volumes:
+      - ./data:/data
+    mem_limit: 256m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
