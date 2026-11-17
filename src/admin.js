@@ -136,6 +136,15 @@ function int(v, fallback = 0) {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+/** 归一化 hy2 混淆：开启且未填密码时自动生成 8 字节 hex */
+function obfsInput(d, row = {}) {
+  const on = d.obfs === undefined ? !!row.obfs : !!d.obfs;
+  if (!on) return { obfs: '', password: '' };
+  let pass = str(d.obfs_password, 100) || row.obfs_password || '';
+  if (!pass) pass = L.randomToken(8);
+  return { obfs: 'salamander', password: pass };
+}
+
 /** 归一化节点入参：vless + reality 时自动补齐密钥与 shortId */
 function nodeInput(d, row = {}) {
   const protocol = (str(d.protocol, 20) || row.protocol || 'hysteria2').toLowerCase();
@@ -354,6 +363,7 @@ async function handle(req, res, url) {
     const port = int(d.port, 443);
     const token = L.randomToken(16);
     const f = nodeInput(d);
+    const hy2 = obfsInput(d);
     const info = db
       .prepare(
         `INSERT INTO nodes (name, host, port, sni, insecure, obfs, obfs_password, up_mbps, down_mbps,
@@ -368,8 +378,8 @@ async function handle(req, res, url) {
         port,
         str(d.sni, 200),
         d.insecure ? 1 : 0,
-        d.obfs ? 'salamander' : '',
-        str(d.obfs_password, 100),
+        hy2.obfs,
+        hy2.password,
         int(d.up_mbps),
         int(d.down_mbps),
         f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
@@ -392,6 +402,7 @@ async function handle(req, res, url) {
     if (req.method === 'PUT') {
       const d = await body(req);
       const f = nodeInput(d, row);
+      const hy2 = obfsInput(d, row);
       db.prepare(
         `UPDATE nodes SET name = ?, host = ?, port = ?, sni = ?, insecure = ?, obfs = ?, obfs_password = ?,
            up_mbps = ?, down_mbps = ?, protocol = ?, flow = ?, network = ?, ws_path = ?, ws_host = ?, tls_mode = ?,
@@ -403,8 +414,8 @@ async function handle(req, res, url) {
         int(d.port, row.port),
         str(d.sni, 200),
         d.insecure ? 1 : 0,
-        d.obfs ? 'salamander' : '',
-        str(d.obfs_password, 100),
+        hy2.obfs,
+        hy2.password,
         int(d.up_mbps),
         int(d.down_mbps),
         f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
