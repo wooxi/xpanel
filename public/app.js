@@ -906,6 +906,41 @@ async function renderUsers() {
   });
 }
 
+/** 用户可选节点的复选框列表 */
+function nodeOptions(selected) {
+  const picked = new Set((selected || []).map(Number));
+  const list = state.nodes.filter((n) => n.enabled);
+  if (!list.length) return '<div class="link-empty">还没有启用中的节点</div>';
+  return list
+    .map(
+      (n) => `<label class="node-pick-item">
+        <input type="checkbox" value="${n.id}" ${picked.has(n.id) ? 'checked' : ''} />
+        <span>${esc(n.name)}</span>
+        <em>${esc(nodePickProto(n))}</em>
+      </label>`
+    )
+    .join('');
+}
+
+function nodePickProto(n) {
+  const proto = String(n.protocol || 'hysteria2');
+  if (proto === 'vless') return `VLESS · ${n.network === 'ws' ? 'WS' : 'TCP'}`;
+  return 'HY2';
+}
+
+function nodePickTip(selected) {
+  return (selected || []).length
+    ? `仅对这 ${selected.length} 个节点生效`
+    : '未选择时可用全部节点';
+}
+
+/** 读取当前勾选的节点 ID（空数组表示不限制） */
+function pickedNodeIds() {
+  const box = el('u-nodes');
+  if (!box) return [];
+  return [...box.querySelectorAll('input[type=checkbox]:checked')].map((i) => Number(i.value));
+}
+
 function userForm(user) {
   const u = user || {};
   openModal(
@@ -924,7 +959,14 @@ function userForm(user) {
      </div>
      <label class="field"><span class="field-label">账号状态</span>
        <select id="u-banned"><option value="0">正常</option><option value="1" ${u.banned ? 'selected' : ''}>停用</option></select>
-     </label>`,
+     </label>
+     <div class="field">
+       <span class="field-label">可用节点</span>
+       <div id="u-nodes" class="node-pick">
+         ${nodeOptions(u.node_ids)}
+       </div>
+       <div class="tip" id="u-nodes-tip">${nodePickTip(u.node_ids)}</div>
+     </div>`,
     [
       { label: '取消', onClick: closeModal },
       {
@@ -940,6 +982,7 @@ function userForm(user) {
             speed_limit: Number(el('u-speed').value) || 0,
             device_limit: Number(el('u-device').value) || 0,
             banned: el('u-banned').value === '1',
+            node_ids: pickedNodeIds(),
           };
           try {
             if (user) await api(`/api/users/${user.id}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -953,6 +996,16 @@ function userForm(user) {
     ],
     { focus: 'u-name' }
   );
+
+  const box = el('u-nodes');
+  if (box) {
+    box.addEventListener('change', () => {
+      const tip = el('u-nodes-tip');
+      if (tip) tip.textContent = pickedNodeIds().length
+        ? `仅对这 ${pickedNodeIds().length} 个节点生效`
+        : '未选择时可用全部节点';
+    });
+  }
 }
 
 async function delUser(user) {

@@ -216,7 +216,26 @@ function userView(req, row) {
     over_limit: L.isOverLimit(row),
     last_online_at: row.last_online_at,
     created_at: row.created_at,
+    node_ids: userNodeIds(row.id),
   };
+}
+
+/** 用户绑定的可用节点 ID 列表（空数组 = 不限制，可用全部节点） */
+function userNodeIds(uid) {
+  return db.prepare('SELECT node_id FROM user_nodes WHERE uid = ? ORDER BY node_id').all(uid).map((r) => r.node_id);
+}
+
+/** 覆盖式写入用户可用节点（传空数组即取消限制） */
+function setUserNodes(uid, nodeIds) {
+  if (!Array.isArray(nodeIds)) return;
+  const valid = new Set(db.prepare('SELECT id FROM nodes').all().map((r) => r.id));
+  const ids = [...new Set(nodeIds.map((v) => Number(v)).filter((v) => valid.has(v)))];
+  const tx = db.transaction((list) => {
+    db.prepare('DELETE FROM user_nodes WHERE uid = ?').run(uid);
+    const ins = db.prepare('INSERT OR IGNORE INTO user_nodes (uid, node_id) VALUES (?, ?)');
+    for (const nid of list) ins.run(uid, nid);
+  });
+  tx(ids);
 }
 
 /* ---------------- 路由 ---------------- */
@@ -400,7 +419,24 @@ async function handle(req, res, url) {
 
     if (req.method === 'DELETE') {
       db.prepare('DELETE FROM nodes WHERE id = ?').run(id);
+      db.prepare('DELETE FROM user_nodes WHERE node_id = ?').run(id);
       return json(res, 200, { ok: true }), true;
+    }
+  }
+
+  const userNodesMatch = path.match(/^\/api\/users\/(\d+)\/nodes$/);
+  if (userNodesMatch) {
+    const uid = Number(userNodesMatch[1]);
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(uid)) {
+      return json(res, 404, { error: '用户不存在' }), true;
+    }
+    if (req.method === 'GET') {
+      return json(res, 200, { node_ids: userNodeIds(uid) }), true;
+    }
+    if (req.method === 'PUT') {
+      const d = await body(req);
+      setUserNodes(uid, Array.isArray(d.node_ids) ? d.node_ids : []);
+      return json(res, 200, { ok: true, node_ids: userNodeIds(uid) }), true;
     }
   }
 
@@ -434,6 +470,7 @@ async function handle(req, res, url) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(name, uuid, subToken, dateToTs(d.expires_date), trafficLimit, int(d.speed_limit), int(d.device_limit), now());
+    if (d.node_ids !== undefined) setUserNodes(info.lastInsertRowid, d.node_ids);
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
     return json(res, 200, userView(req, row)), true;
   }
@@ -459,11 +496,13 @@ async function handle(req, res, url) {
         d.banned ? 1 : 0,
         id
       );
+      if (d.node_ids !== undefined) setUserNodes(id, d.node_ids);
       return json(res, 200, userView(req, db.prepare('SELECT * FROM users WHERE id = ?').get(id))), true;
     }
 
     if (req.method === 'DELETE') {
       db.prepare('DELETE FROM users WHERE id = ?').run(id);
+      db.prepare('DELETE FROM user_nodes WHERE uid = ?').run(id);
       return json(res, 200, { ok: true }), true;
     }
   }
