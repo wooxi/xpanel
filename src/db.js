@@ -25,6 +25,19 @@ CREATE TABLE IF NOT EXISTS nodes (
   obfs_password TEXT    NOT NULL DEFAULT '',
   up_mbps       INTEGER NOT NULL DEFAULT 0,
   down_mbps     INTEGER NOT NULL DEFAULT 0,
+  protocol      TEXT    NOT NULL DEFAULT 'hysteria2',
+  flow          TEXT    NOT NULL DEFAULT '',
+  network       TEXT    NOT NULL DEFAULT 'tcp',
+  ws_path       TEXT    NOT NULL DEFAULT '/',
+  ws_host       TEXT    NOT NULL DEFAULT '',
+  tls_mode      INTEGER NOT NULL DEFAULT 2,
+  reality_dest  TEXT    NOT NULL DEFAULT '',
+  reality_server_names TEXT NOT NULL DEFAULT '',
+  reality_private_key  TEXT NOT NULL DEFAULT '',
+  reality_public_key   TEXT NOT NULL DEFAULT '',
+  reality_short_ids    TEXT NOT NULL DEFAULT '',
+  cert_path     TEXT    NOT NULL DEFAULT '',
+  key_path      TEXT    NOT NULL DEFAULT '',
   token         TEXT    NOT NULL UNIQUE,
   enabled       INTEGER NOT NULL DEFAULT 1,
   sort          INTEGER NOT NULL DEFAULT 0,
@@ -93,6 +106,32 @@ CREATE INDEX IF NOT EXISTS idx_nodes_token ON nodes(token);
 CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_logs_source ON logs(source);
 `);
+
+// 老库升级：为 nodes 表补齐 vless/reality 相关列（幂等）
+const NODE_COLUMNS = [
+  ['protocol', "TEXT NOT NULL DEFAULT 'hysteria2'"],
+  ['flow', "TEXT NOT NULL DEFAULT ''"],
+  ['network', "TEXT NOT NULL DEFAULT 'tcp'"],
+  ['ws_path', "TEXT NOT NULL DEFAULT '/'"],
+  ['ws_host', "TEXT NOT NULL DEFAULT ''"],
+  ['tls_mode', 'INTEGER NOT NULL DEFAULT 2'],
+  ['reality_dest', "TEXT NOT NULL DEFAULT ''"],
+  ['reality_server_names', "TEXT NOT NULL DEFAULT ''"],
+  ['reality_private_key', "TEXT NOT NULL DEFAULT ''"],
+  ['reality_public_key', "TEXT NOT NULL DEFAULT ''"],
+  ['reality_short_ids', "TEXT NOT NULL DEFAULT ''"],
+  ['cert_path', "TEXT NOT NULL DEFAULT ''"],
+  ['key_path', "TEXT NOT NULL DEFAULT ''"],
+];
+
+function migrateNodes() {
+  const existing = new Set(db.prepare('PRAGMA table_info(nodes)').all().map((c) => c.name));
+  for (const [name, ddl] of NODE_COLUMNS) {
+    if (existing.has(name)) continue;
+    db.exec(`ALTER TABLE nodes ADD COLUMN ${name} ${ddl}`);
+  }
+}
+migrateNodes();
 
 const now = () => Math.floor(Date.now() / 1000);
 

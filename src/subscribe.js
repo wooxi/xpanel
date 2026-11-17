@@ -23,15 +23,31 @@ function activeNodes(userId) {
   return all.filter((n) => allowed.has(n.id));
 }
 
-function nodeYaml(user, node) {
-  const item = L.clashNode(user, node);
-  const lines = [`  - name: ${L.yq(item.name)}`];
-  for (const [k, v] of Object.entries(item)) {
-    if (k === 'name') continue;
-    if (typeof v === 'boolean') lines.push(`    ${k}: ${v}`);
-    else if (typeof v === 'number') lines.push(`    ${k}: ${v}`);
-    else lines.push(`    ${k}: ${L.yq(v)}`);
+/** 递归输出 Clash 节点 YAML，支持 reality-opts / ws-opts 这类嵌套对象 */
+function yamlLines(obj, indent) {
+  const pad = ' '.repeat(indent);
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      out.push(`${pad}${k}:`);
+      out.push(...yamlLines(v, indent + 2));
+    } else if (Array.isArray(v)) {
+      out.push(`${pad}${k}: [${v.map((x) => L.yq(x)).join(', ')}]`);
+    } else if (typeof v === 'boolean' || typeof v === 'number') {
+      out.push(`${pad}${k}: ${v}`);
+    } else if (v != null) {
+      out.push(`${pad}${k}: ${L.yq(v)}`);
+    }
   }
+  return out;
+}
+
+function nodeYaml(user, node) {
+  const item = L.isVless(node) ? L.clashVlessNode(user, node) : L.clashNode(user, node);
+  const lines = [`  - name: ${L.yq(item.name)}`];
+  const rest = { ...item };
+  delete rest.name;
+  lines.push(...yamlLines(rest, 4));
   return lines.join('\n');
 }
 
@@ -67,6 +83,11 @@ function renderClash(user, nodes, tplOverride) {
     .replaceAll('proxies: []', groupFill);
 }
 
+/** 按节点协议生成单节点链接 */
+function nodeLink(user, node) {
+  return L.isVless(node) ? L.vlessLink(user, node) : L.hysteria2Link(user, node);
+}
+
 function unavailableReason(user) {
   if (user.banned) return '订阅已停用，请联系管理员';
   if (L.isExpired(user)) return '订阅已到期，请联系管理员';
@@ -79,12 +100,12 @@ function renderRocket(user, nodes) {
   const lines = [
     `STATUS=↑${L.fmtSize(user.up)} ↓${L.fmtSize(user.down)} TOT:${total} 到期:${L.fmtDate(user.expires_at)}`,
   ];
-  for (const n of nodes) lines.push(L.hysteria2Link(user, n));
+  for (const n of nodes) lines.push(nodeLink(user, n));
   return L.base64(lines.join('\r\n'));
 }
 
 function renderGeneral(user, nodes) {
-  const links = nodes.map((n) => L.hysteria2Link(user, n));
+  const links = nodes.map((n) => nodeLink(user, n));
   return L.base64(links.join('\r\n'));
 }
 

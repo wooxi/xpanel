@@ -77,6 +77,96 @@ function clashNode(user, node) {
   return item;
 }
 
+/** 生成 Reality 用的 X25519 密钥对（base64url 原始 32 字节，Xray 要求格式） */
+function genRealityKeys() {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('x25519');
+  const raw = (buf) => buf.subarray(-32);
+  const b64u = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return {
+    privateKey: b64u(raw(privateKey.export({ type: 'pkcs8', format: 'der' }))),
+    publicKey: b64u(raw(publicKey.export({ type: 'spki', format: 'der' }))),
+  };
+}
+
+/** Reality shortId（8 字节 hex） */
+function genShortId() {
+  return crypto.randomBytes(8).toString('hex');
+}
+
+/** 节点是否 vless 协议 */
+function isVless(node) {
+  return String(node.protocol || '').toLowerCase().startsWith('vless');
+}
+
+/** 节点是否 hysteria2 协议 */
+function isHysteria(node) {
+  const p = String(node.protocol || '').toLowerCase();
+  return p === '' || p === 'hysteria' || p === 'hysteria2';
+}
+
+/** vless:// 单节点链接（Reality / WS+TLS 两种） */
+function vlessLink(user, node) {
+  const auth = encodeURIComponent(user.uuid);
+  const host = String(node.host).includes(':') ? `[${node.host}]` : node.host;
+  const params = new URLSearchParams();
+  params.set('encryption', 'none');
+  const net = node.network === 'ws' ? 'ws' : 'tcp';
+  params.set('type', net);
+
+  const reality = Number(node.tls_mode) === 2;
+  if (reality) {
+    params.set('security', 'reality');
+    if (node.sni) params.set('sni', node.sni);
+    params.set('fp', 'chrome');
+    if (node.flow) params.set('flow', node.flow);
+    if (node.reality_public_key) params.set('pbk', node.reality_public_key);
+    const sid = String(node.reality_short_ids || '').split(',')[0].trim();
+    if (sid) params.set('sid', sid);
+  } else if (Number(node.tls_mode) === 1) {
+    params.set('security', 'tls');
+    if (node.sni) params.set('sni', node.sni);
+    params.set('fp', 'chrome');
+  }
+  if (net === 'ws') {
+    if (node.ws_path) params.set('path', node.ws_path);
+    params.set('host', node.ws_host || node.sni || node.host);
+  }
+  const name = encodeURIComponent(node.name || node.host);
+  return `vless://${auth}@${host}:${node.port}?${params.toString()}#${name}`;
+}
+
+/** Clash / mihomo 的 vless 节点对象 */
+function clashVlessNode(user, node) {
+  const reality = Number(node.tls_mode) === 2;
+  const net = node.network === 'ws' ? 'ws' : 'tcp';
+  const item = {
+    name: node.name,
+    type: 'vless',
+    server: node.host,
+    port: Number(node.port),
+    uuid: user.uuid,
+    network: net,
+    udp: true,
+    tls: Number(node.tls_mode) > 0,
+  };
+  if (node.sni) item.servername = node.sni;
+  item['client-fingerprint'] = 'chrome';
+  if (node.insecure) item['skip-cert-verify'] = true;
+  if (node.flow) item.flow = node.flow;
+  if (net === 'ws') {
+    item['ws-opts'] = {
+      path: node.ws_path || '/',
+      headers: { Host: node.ws_host || node.sni || node.host },
+    };
+  }
+  if (reality && node.reality_public_key) {
+    const sid = String(node.reality_short_ids || '').split(',')[0].trim();
+    item['reality-opts'] = { 'public-key': node.reality_public_key };
+    if (sid) item['reality-opts']['short-id'] = sid;
+  }
+  return item;
+}
+
 const CLASH_UA = [
   'clash', 'mihomo', 'clashmeta', 'clash-verge', 'clashverge', 'flclash',
   'stash', 'surfboard', 'loon', 'nekobox', 'nekoray', 'clashx',
@@ -149,6 +239,12 @@ module.exports = {
   fmtGiB,
   hysteria2Link,
   clashNode,
+  genRealityKeys,
+  genShortId,
+  isVless,
+  isHysteria,
+  vlessLink,
+  clashVlessNode,
   detectFormat,
   base64,
   yq,

@@ -360,7 +360,7 @@ async function renderDashboard() {
           <div class="list-main">
             <div class="list-title">
               ${esc(x.name)}
-              <span class="proto">HY2${esc(x.obfs ? ' + ' + x.obfs : '')}</span>
+              <span class="proto">${protoTag(x)}</span>
             </div>
             <div class="list-meta">${parts.join(' · ')}</div>
           </div>
@@ -467,6 +467,23 @@ async function loadNodes() {
   el('nav-node-count').textContent = String(state.nodes.length);
 }
 
+/** 节点协议标签 */
+function protoTag(n) {
+  if (String(n.protocol || 'hysteria2') === 'vless') {
+    const net = n.network === 'ws' ? 'WS' : 'TCP';
+    const sec = Number(n.tls_mode) === 2 ? 'Reality' : Number(n.tls_mode) === 1 ? 'TLS' : '无加密';
+    return `VLESS · ${net}+${sec}`;
+  }
+  return `HY2${n.obfs ? ' + ' + n.obfs : ''}`;
+}
+
+/** vless 传输与加密组合描述 */
+function vlessDesc(n) {
+  const net = n.network === 'ws' ? 'WebSocket' : 'TCP';
+  const sec = Number(n.tls_mode) === 2 ? 'Reality' : Number(n.tls_mode) === 1 ? 'TLS' : '不加密';
+  return `${net} / ${sec}`;
+}
+
 async function renderNodes() {
   await loadNodes();
   const box = el('node-list');
@@ -514,7 +531,7 @@ async function renderNodes() {
           <div class="node-spec"><dt>SNI</dt><dd title="${esc(n.sni || '')}">${esc(n.sni || '—')}</dd></div>
           <div class="node-spec"><dt>最后上报</dt><dd>${n.last_report_at ? relTime(n.last_report_at) : '从未'}</dd></div>
           <div class="node-spec"><dt>上行 / 下行</dt><dd>${esc(rate)}</dd></div>
-          <div class="node-spec"><dt>混淆</dt><dd>${n.obfs ? 'salamander' : '关闭'}</dd></div>
+          <div class="node-spec"><dt>${n.protocol === 'vless' ? '传输 / 加密' : '混淆'}</dt><dd>${n.protocol === 'vless' ? esc(vlessDesc(n)) : (n.obfs ? 'salamander' : '关闭')}</dd></div>
         </dl>
         <div class="node-foot">
           <span class="mono" style="font-size:11px;color:var(--ink-4)">#${esc(n.id)}</span>
@@ -539,12 +556,28 @@ async function renderNodes() {
 
 function nodeForm(node) {
   const n = node || {};
+  const proto = String(n.protocol || 'hysteria2').toLowerCase();
+  const isVless = proto === 'vless';
+  const tlsMode = Number(n.tls_mode ?? 2);
+  const net = n.network === 'ws' ? 'ws' : 'tcp';
+
   openModal(
     node ? `编辑节点 · ${n.name}` : '添加节点',
     `<label class="field">
        <span class="field-label">节点名称</span>
        <input type="text" id="f-name" value="${esc(n.name || '')}" placeholder="日本 · 大阪 01" />
      </label>
+     <div class="field-row">
+       <label class="field"><span class="field-label">协议</span>
+         <select id="f-protocol">
+           <option value="hysteria2" ${isVless ? '' : 'selected'}>Hysteria2</option>
+           <option value="vless" ${isVless ? 'selected' : ''}>VLESS</option>
+         </select>
+       </label>
+       <label class="field"><span class="field-label">启用状态</span>
+         <select id="f-enabled"><option value="1">启用</option><option value="0" ${n.enabled === 0 ? 'selected' : ''}>停用</option></select>
+       </label>
+     </div>
      <div class="field-row">
        <label class="field"><span class="field-label">服务器地址</span><input type="text" id="f-host" value="${esc(n.host || '')}" placeholder="1.2.3.4 或 node.example.com" /></label>
        <label class="field"><span class="field-label">端口</span><input id="f-port" type="number" value="${esc(n.port || 443)}" /></label>
@@ -553,22 +586,67 @@ function nodeForm(node) {
        <span class="field-label">SNI / 域名</span>
        <input type="text" id="f-sni" value="${esc(n.sni || '')}" placeholder="browser.yourdomain.com" />
      </label>
-     <div class="field-row">
-       <label class="field"><span class="field-label">上行 Mbps</span><input id="f-up" type="number" value="${esc(n.up_mbps || '')}" placeholder="0" /></label>
-       <label class="field"><span class="field-label">下行 Mbps</span><input id="f-down" type="number" value="${esc(n.down_mbps || '')}" placeholder="0" /></label>
+
+     <div id="grp-hy2" ${isVless ? 'hidden' : ''}>
+       <div class="field-row">
+         <label class="field"><span class="field-label">上行 Mbps</span><input id="f-up" type="number" value="${esc(n.up_mbps || '')}" placeholder="0" /></label>
+         <label class="field"><span class="field-label">下行 Mbps</span><input id="f-down" type="number" value="${esc(n.down_mbps || '')}" placeholder="0" /></label>
+       </div>
+       <div class="field-row">
+         <label class="field"><span class="field-label">混淆</span>
+           <select id="f-obfs"><option value="">关闭</option><option value="1" ${n.obfs ? 'selected' : ''}>salamander</option></select>
+         </label>
+         <label class="field"><span class="field-label">混淆密码</span><input type="text" id="f-obfs-pass" value="${esc(n.obfs_password || '')}" placeholder="可选" /></label>
+       </div>
      </div>
-     <div class="field-row">
-       <label class="field"><span class="field-label">混淆</span>
-         <select id="f-obfs"><option value="">关闭</option><option value="1" ${n.obfs ? 'selected' : ''}>salamander</option></select>
+
+     <div id="grp-vless" ${isVless ? '' : 'hidden'}>
+       <div class="field-row">
+         <label class="field"><span class="field-label">传输方式</span>
+           <select id="f-network">
+             <option value="tcp" ${net === 'tcp' ? 'selected' : ''}>TCP</option>
+             <option value="ws" ${net === 'ws' ? 'selected' : ''}>WebSocket</option>
+           </select>
+         </label>
+         <label class="field"><span class="field-label">加密</span>
+           <select id="f-tls-mode">
+             <option value="2" ${tlsMode === 2 ? 'selected' : ''}>Reality</option>
+             <option value="1" ${tlsMode === 1 ? 'selected' : ''}>TLS</option>
+             <option value="0" ${tlsMode === 0 ? 'selected' : ''}>不加密</option>
+           </select>
+         </label>
+       </div>
+       <label class="field"><span class="field-label">flow</span>
+         <input type="text" id="f-flow" value="${esc(n.flow || '')}" placeholder="xtls-rprx-vision（仅 Reality+TCP 用）" />
        </label>
-       <label class="field"><span class="field-label">混淆密码</span><input type="text" id="f-obfs-pass" value="${esc(n.obfs_password || '')}" placeholder="可选" /></label>
+       <div id="grp-ws" ${net === 'ws' ? '' : 'hidden'}>
+         <div class="field-row">
+           <label class="field"><span class="field-label">WS 路径</span><input type="text" id="f-ws-path" value="${esc(n.ws_path || '/')}" placeholder="/" /></label>
+           <label class="field"><span class="field-label">WS Host</span><input type="text" id="f-ws-host" value="${esc(n.ws_host || '')}" placeholder="cdn.example.com" /></label>
+         </div>
+         <div class="field-row">
+           <label class="field"><span class="field-label">证书路径（节点端）</span><input type="text" id="f-cert-path" value="${esc(n.cert_path || '')}" placeholder="/etc/nodex/fullchain.pem" /></label>
+           <label class="field"><span class="field-label">私钥路径（节点端）</span><input type="text" id="f-key-path" value="${esc(n.key_path || '')}" placeholder="/etc/nodex/privkey.pem" /></label>
+         </div>
+       </div>
+       <div id="grp-reality" ${tlsMode === 2 ? '' : 'hidden'}>
+         <label class="field"><span class="field-label">伪装目标 dest</span>
+           <input type="text" id="f-r-dest" value="${esc(n.reality_dest || '')}" placeholder="www.microsoft.com:443" />
+         </label>
+         <div class="field-row">
+           <label class="field"><span class="field-label">serverNames</span><input type="text" id="f-r-names" value="${esc(n.reality_server_names || '')}" placeholder="逗号分隔" /></label>
+           <label class="field"><span class="field-label">shortIds</span><input type="text" id="f-r-sids" value="${esc(n.reality_short_ids || '')}" placeholder="留空自动生成" /></label>
+         </div>
+         <div class="field-row">
+           <label class="field"><span class="field-label">私钥</span><input type="text" id="f-r-priv" value="${esc(n.reality_private_key || '')}" placeholder="留空自动生成" /></label>
+           <label class="field"><span class="field-label">公钥</span><input type="text" id="f-r-pub" value="${esc(n.reality_public_key || '')}" placeholder="留空自动生成" /></label>
+         </div>
+       </div>
      </div>
+
      <div class="field-row">
        <label class="field"><span class="field-label">跳过证书校验</span>
          <select id="f-insecure"><option value="0">否</option><option value="1" ${n.insecure ? 'selected' : ''}>是</option></select>
-       </label>
-       <label class="field"><span class="field-label">启用状态</span>
-         <select id="f-enabled"><option value="1">启用</option><option value="0" ${n.enabled === 0 ? 'selected' : ''}>停用</option></select>
        </label>
      </div>`,
     [
@@ -580,18 +658,41 @@ function nodeForm(node) {
           const name = el('f-name').value.trim();
           const host = el('f-host').value.trim();
           if (!name || !host) { toast('节点名称与地址不能为空', 'err'); return; }
+          const protocol = el('f-protocol').value;
           const payload = {
             name,
             host,
             port: Number(el('f-port').value) || 443,
             sni: el('f-sni').value.trim(),
-            up_mbps: Number(el('f-up').value) || 0,
-            down_mbps: Number(el('f-down').value) || 0,
-            obfs: el('f-obfs').value === '1',
-            obfs_password: el('f-obfs-pass').value.trim(),
             insecure: el('f-insecure').value === '1',
             enabled: el('f-enabled').value === '1',
+            protocol,
           };
+          if (protocol === 'vless') {
+            Object.assign(payload, {
+              network: el('f-network').value,
+              tls_mode: Number(el('f-tls-mode').value),
+              flow: el('f-flow').value.trim(),
+              ws_path: el('f-ws-path').value.trim() || '/',
+              ws_host: el('f-ws-host').value.trim(),
+              cert_path: el('f-cert-path').value.trim(),
+              key_path: el('f-key-path').value.trim(),
+              reality_dest: el('f-r-dest').value.trim(),
+              reality_server_names: el('f-r-names').value.trim(),
+              reality_private_key: el('f-r-priv').value.trim(),
+              reality_public_key: el('f-r-pub').value.trim(),
+              reality_short_ids: el('f-r-sids').value.trim(),
+              up_mbps: 0,
+              down_mbps: 0,
+            });
+          } else {
+            Object.assign(payload, {
+              up_mbps: Number(el('f-up').value) || 0,
+              down_mbps: Number(el('f-down').value) || 0,
+              obfs: el('f-obfs').value === '1',
+              obfs_password: el('f-obfs-pass').value.trim(),
+            });
+          }
           try {
             if (node) await api(`/api/nodes/${node.id}`, { method: 'PUT', body: JSON.stringify(payload) });
             else await api('/api/nodes', { method: 'POST', body: JSON.stringify(payload) });
@@ -602,8 +703,27 @@ function nodeForm(node) {
         },
       },
     ],
-    { focus: 'f-name' }
+    { focus: 'f-name', wide: true }
   );
+
+  const sync = () => {
+    const p = el('f-protocol').value;
+    const vless = p === 'vless';
+    el('grp-hy2').hidden = vless;
+    el('grp-vless').hidden = !vless;
+    if (!vless) return;
+    const mode = Number(el('f-tls-mode').value);
+    const ws = el('f-network').value === 'ws';
+    el('grp-ws').hidden = !ws;
+    el('grp-reality').hidden = mode !== 2;
+    if (ws && mode === 2) {
+      el('f-tls-mode').value = '1';
+      toast('WebSocket 模式下 Reality 不可用，已切到 TLS', 'warn');
+    }
+  };
+  ['f-protocol', 'f-network', 'f-tls-mode'].forEach((id) => {
+    el(id)?.addEventListener('change', sync);
+  });
 }
 
 async function delNode(node) {

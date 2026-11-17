@@ -69,6 +69,47 @@ function availableUsers() {
 function buildNodeConfig(node) {
   const push = Number(getSetting('push_interval', '60')) || 60;
   const pull = Number(getSetting('pull_interval', '60')) || 60;
+
+  if (L.isVless(node)) {
+    const net = node.network === 'ws' ? 'ws' : 'tcp';
+    const tlsMode = Number(node.tls_mode) || 0;
+    const serverName = node.sni || node.host;
+    const cfg = {
+      protocol: 'vless',
+      listen_ip: '0.0.0.0',
+      server_port: Number(node.port),
+      network: net,
+      networkSettings:
+        net === 'ws'
+          ? { path: node.ws_path || '/', headers: { Host: node.ws_host || serverName } }
+          : null,
+      flow: node.flow || '',
+      tls: tlsMode,
+      tls_settings: {
+        server_name: serverName,
+        allow_insecure: !!node.insecure,
+        cert_path: node.cert_path || '',
+        key_path: node.key_path || '',
+      },
+      base_config: { push_interval: push, pull_interval: pull },
+    };
+    if (tlsMode === 2) {
+      cfg.reality_settings = {
+        dest: node.reality_dest || `${serverName}:443`,
+        server_names: String(node.reality_server_names || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        private_key: node.reality_private_key || '',
+        short_ids: String(node.reality_short_ids || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      };
+    }
+    return cfg;
+  }
+
   return {
     protocol: 'hysteria',
     listen_ip: '0.0.0.0',
@@ -293,7 +334,8 @@ function handleSubscribe(req, res, url) {
     if (!L.isActive(user)) return sendRaw(res, 403, 'text/plain; charset=utf-8', sub.unavailableReason(user)), true;
     const node = db.prepare('SELECT * FROM nodes WHERE id = ? AND enabled = 1').get(Number(linkMatch[2]));
     if (!node) return sendRaw(res, 404, 'text/plain; charset=utf-8', 'node not found'), true;
-    return sendRaw(res, 200, 'text/plain; charset=utf-8', L.hysteria2Link(user, node)), true;
+    const link = L.isVless(node) ? L.vlessLink(user, node) : L.hysteria2Link(user, node);
+    return sendRaw(res, 200, 'text/plain; charset=utf-8', link), true;
   }
 
   return false;

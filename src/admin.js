@@ -136,6 +136,38 @@ function int(v, fallback = 0) {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+/** 归一化节点入参：vless + reality 时自动补齐密钥与 shortId */
+function nodeInput(d, row = {}) {
+  const protocol = (str(d.protocol, 20) || row.protocol || 'hysteria2').toLowerCase();
+  const tlsMode = d.tls_mode === undefined ? Number(row.tls_mode ?? 2) : int(d.tls_mode, 2);
+  let priv = str(d.reality_private_key, 200) || row.reality_private_key || '';
+  let pub = str(d.reality_public_key, 200) || row.reality_public_key || '';
+  let sid = str(d.reality_short_ids, 300) || row.reality_short_ids || '';
+  if (protocol === 'vless' && tlsMode === 2) {
+    if (!priv || !pub) {
+      const k = L.genRealityKeys();
+      priv = k.privateKey;
+      pub = k.publicKey;
+    }
+    if (!sid) sid = L.genShortId();
+  }
+  return {
+    protocol,
+    flow: str(d.flow, 40),
+    network: str(d.network, 10) === 'ws' ? 'ws' : 'tcp',
+    ws_path: str(d.ws_path, 200) || '/',
+    ws_host: str(d.ws_host, 200),
+    tls_mode: tlsMode,
+    reality_dest: str(d.reality_dest, 200),
+    reality_server_names: str(d.reality_server_names, 300),
+    reality_private_key: priv,
+    reality_public_key: pub,
+    reality_short_ids: sid,
+    cert_path: str(d.cert_path, 300),
+    key_path: str(d.key_path, 300),
+  };
+}
+
 /** 'YYYY-MM-DD' -> 当天 23:59:59 时间戳；空 -> null */
 function dateToTs(v) {
   const s = str(v, 20);
@@ -302,10 +334,14 @@ async function handle(req, res, url) {
     if (!name || !host) return json(res, 400, { error: '名称和地址必填' }), true;
     const port = int(d.port, 443);
     const token = L.randomToken(16);
+    const f = nodeInput(d);
     const info = db
       .prepare(
-        `INSERT INTO nodes (name, host, port, sni, insecure, obfs, obfs_password, up_mbps, down_mbps, token, enabled, sort, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO nodes (name, host, port, sni, insecure, obfs, obfs_password, up_mbps, down_mbps,
+           protocol, flow, network, ws_path, ws_host, tls_mode,
+           reality_dest, reality_server_names, reality_private_key, reality_public_key, reality_short_ids,
+           cert_path, key_path, token, enabled, sort, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         name,
@@ -317,12 +353,15 @@ async function handle(req, res, url) {
         str(d.obfs_password, 100),
         int(d.up_mbps),
         int(d.down_mbps),
+        f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
+        f.reality_dest, f.reality_server_names, f.reality_private_key, f.reality_public_key, f.reality_short_ids,
+        f.cert_path, f.key_path,
         token,
         d.enabled === false ? 0 : 1,
         int(d.sort),
         now()
       );
-    return json(res, 200, { id: info.lastInsertRowid, token }), true;
+    return json(res, 200, { id: info.lastInsertRowid, token, reality_public_key: f.reality_public_key }), true;
   }
 
   const nodeIdMatch = path.match(/^\/api\/nodes\/(\d+)$/);
@@ -333,9 +372,12 @@ async function handle(req, res, url) {
 
     if (req.method === 'PUT') {
       const d = await body(req);
+      const f = nodeInput(d, row);
       db.prepare(
         `UPDATE nodes SET name = ?, host = ?, port = ?, sni = ?, insecure = ?, obfs = ?, obfs_password = ?,
-           up_mbps = ?, down_mbps = ?, enabled = ?, sort = ? WHERE id = ?`
+           up_mbps = ?, down_mbps = ?, protocol = ?, flow = ?, network = ?, ws_path = ?, ws_host = ?, tls_mode = ?,
+           reality_dest = ?, reality_server_names = ?, reality_private_key = ?, reality_public_key = ?, reality_short_ids = ?,
+           cert_path = ?, key_path = ?, enabled = ?, sort = ? WHERE id = ?`
       ).run(
         str(d.name) || row.name,
         str(d.host, 200) || row.host,
@@ -346,6 +388,9 @@ async function handle(req, res, url) {
         str(d.obfs_password, 100),
         int(d.up_mbps),
         int(d.down_mbps),
+        f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
+        f.reality_dest, f.reality_server_names, f.reality_private_key, f.reality_public_key, f.reality_short_ids,
+        f.cert_path, f.key_path,
         d.enabled === false ? 0 : 1,
         int(d.sort),
         id
