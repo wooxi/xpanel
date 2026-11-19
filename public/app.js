@@ -598,6 +598,7 @@ function nodeForm(node) {
          </label>
          <label class="field"><span class="field-label">混淆密码</span><input type="text" id="f-obfs-pass" value="${esc(n.obfs_password || '')}" placeholder="可选" /></label>
        </div>
+       <label class="field"><span class="field-label">端口跳跃 (mport)</span><input type="text" id="f-port-hopping" value="${esc(n.port_hopping || '')}" placeholder="如 20000-50000（需服务端配合 UDP 重定向）" /></label>
      </div>
 
      <div id="grp-vless" ${isVless ? '' : 'hidden'}>
@@ -691,6 +692,7 @@ function nodeForm(node) {
               down_mbps: Number(el('f-down').value) || 0,
               obfs: el('f-obfs').value === '1',
               obfs_password: el('f-obfs-pass').value.trim(),
+              port_hopping: el('f-port-hopping').value.trim(),
             });
           }
           try {

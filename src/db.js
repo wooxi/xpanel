@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   obfs_password TEXT    NOT NULL DEFAULT '',
   up_mbps       INTEGER NOT NULL DEFAULT 0,
   down_mbps     INTEGER NOT NULL DEFAULT 0,
+  port_hopping  TEXT    NOT NULL DEFAULT '',
   protocol      TEXT    NOT NULL DEFAULT 'hysteria2',
   flow          TEXT    NOT NULL DEFAULT '',
   network       TEXT    NOT NULL DEFAULT 'tcp',
@@ -122,6 +123,7 @@ const NODE_COLUMNS = [
   ['reality_short_ids', "TEXT NOT NULL DEFAULT ''"],
   ['cert_path', "TEXT NOT NULL DEFAULT ''"],
   ['key_path', "TEXT NOT NULL DEFAULT ''"],
+  ['port_hopping', "TEXT NOT NULL DEFAULT ''"],
 ];
 
 function migrateNodes() {

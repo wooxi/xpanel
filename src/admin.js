@@ -366,11 +366,11 @@ async function handle(req, res, url) {
     const hy2 = obfsInput(d);
     const info = db
       .prepare(
-        `INSERT INTO nodes (name, host, port, sni, insecure, obfs, obfs_password, up_mbps, down_mbps,
+        `INSERT INTO nodes (name, host, port, sni, insecure, obfs, obfs_password, up_mbps, down_mbps, port_hopping,
            protocol, flow, network, ws_path, ws_host, tls_mode,
            reality_dest, reality_server_names, reality_private_key, reality_public_key, reality_short_ids,
            cert_path, key_path, token, enabled, sort, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         name,
@@ -382,6 +382,7 @@ async function handle(req, res, url) {
         hy2.password,
         int(d.up_mbps),
         int(d.down_mbps),
+        str(d.port_hopping, 100),
         f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
         f.reality_dest, f.reality_server_names, f.reality_private_key, f.reality_public_key, f.reality_short_ids,
         f.cert_path, f.key_path,
@@ -405,7 +406,7 @@ async function handle(req, res, url) {
       const hy2 = obfsInput(d, row);
       db.prepare(
         `UPDATE nodes SET name = ?, host = ?, port = ?, sni = ?, insecure = ?, obfs = ?, obfs_password = ?,
-           up_mbps = ?, down_mbps = ?, protocol = ?, flow = ?, network = ?, ws_path = ?, ws_host = ?, tls_mode = ?,
+           up_mbps = ?, down_mbps = ?, port_hopping = ?, protocol = ?, flow = ?, network = ?, ws_path = ?, ws_host = ?, tls_mode = ?,
            reality_dest = ?, reality_server_names = ?, reality_private_key = ?, reality_public_key = ?, reality_short_ids = ?,
            cert_path = ?, key_path = ?, enabled = ?, sort = ? WHERE id = ?`
       ).run(
@@ -418,6 +419,7 @@ async function handle(req, res, url) {
         hy2.password,
         int(d.up_mbps),
         int(d.down_mbps),
+        str(d.port_hopping, 100),
         f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
         f.reality_dest, f.reality_server_names, f.reality_private_key, f.reality_public_key, f.reality_short_ids,
         f.cert_path, f.key_path,

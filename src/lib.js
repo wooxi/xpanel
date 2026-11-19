@@ -52,6 +52,8 @@ function hysteria2Link(user, node) {
     params.set('obfs', 'salamander');
     if (node.obfs_password) params.set('obfs-password', node.obfs_password);
   }
+  const hopping = String(node.port_hopping || '').trim();
+  if (hopping) params.set('mport', hopping);
   const name = encodeURIComponent(node.name || node.host);
   return `hysteria2://${auth}@${host}:${node.port}?${params.toString()}#${name}`;
 }
@@ -74,6 +76,8 @@ function clashNode(user, node) {
     item.obfs = 'salamander';
     if (node.obfs_password) item['obfs-password'] = node.obfs_password;
   }
+  const hopping = String(node.port_hopping || '').trim();
+  if (hopping) item.ports = hopping;
   return item;
 }
 

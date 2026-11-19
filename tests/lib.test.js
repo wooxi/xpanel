@@ -38,6 +38,15 @@ test('IPv6 主机加方括号', () => {
   assert.match(link, /@\[2001:db8::1\]:443/);
 });
 
+test('hysteria2Link 与 clashNode 支持 port_hopping', () => {
+  const u = { uuid: 'abc' };
+  const n = { name: 'Hy2', host: 'node.example.com', port: 20001, sni: 'node.example.com', insecure: 1, port_hopping: '20000-50000' };
+  const link = L.hysteria2Link(u, n);
+  assert.match(link, /mport=20000-50000/);
+  const clash = L.clashNode(u, n);
+  assert.equal(clash.ports, '20000-50000');
+});
+
 test('isExpired / isOverLimit 各自判断，isActive 合并', () => {
   const now = Math.floor(Date.now() / 1000);
   assert.equal(L.isExpired({ expires_at: now - 10 }), true);

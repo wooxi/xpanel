@@ -125,6 +125,7 @@ function buildNodeConfig(node) {
     },
     up_mbps: Number(node.up_mbps) || 0,
     down_mbps: Number(node.down_mbps) || 0,
+    port_hopping: node.port_hopping ? String(node.port_hopping).trim() : '',
     obfs: node.obfs ? 'salamander' : null,
     'obfs-password': node.obfs ? node.obfs_password || null : null,
     base_config: { push_interval: push, pull_interval: pull },
