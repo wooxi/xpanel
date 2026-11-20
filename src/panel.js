@@ -28,7 +28,7 @@ function logNodeSync(node, req) {
     source: 'node',
     action: 'sync',
     message: `节点「${node.name}」拉取配置`,
-    meta: { node_id: node.id, type: node.type, host: node.host, port: node.port },
+    meta: { node_id: node.id, type: node.protocol || 'hysteria2', host: node.host, port: node.port },
     ip: clientIp(req),
   });
 }
@@ -53,8 +53,23 @@ function findNode(token) {
   return db.prepare('SELECT * FROM nodes WHERE token = ?').get(token) || null;
 }
 
-function availableUsers() {
+function availableUsers(nodeId) {
   const ts = now();
+  if (nodeId != null) {
+    return db
+      .prepare(
+        `SELECT id, uuid, speed_limit, device_limit FROM users
+         WHERE banned = 0
+           AND (expires_at IS NULL OR expires_at > ?)
+           AND (traffic_limit IS NULL OR up + down < traffic_limit)
+           AND (
+             NOT EXISTS (SELECT 1 FROM user_nodes WHERE uid = users.id)
+             OR EXISTS (SELECT 1 FROM user_nodes WHERE uid = users.id AND node_id = ?)
+           )
+         ORDER BY id ASC`
+      )
+      .all(ts, nodeId);
+  }
   return db
     .prepare(
       `SELECT id, uuid, speed_limit, device_limit FROM users
@@ -202,7 +217,7 @@ async function handle(req, res, url) {
   }
 
   if (req.method === 'GET' && action === 'user') {
-    const users = availableUsers();
+    const users = availableUsers(node.id);
     const payload = JSON.stringify({ users });
     const etag = `"${require('node:crypto').createHash('sha1').update(payload).digest('hex')}"`;
     if (req.headers['if-none-match'] === etag) {
@@ -255,7 +270,7 @@ async function handle(req, res, url) {
 
   if (req.method === 'GET' && action === 'alivelist') {
     const out = {};
-    for (const u of availableUsers()) {
+    for (const u of availableUsers(node.id)) {
       if (u.device_limit > 0) out[u.id] = aliveOf(u.id);
     }
     json(res, 200, { alive: out });
@@ -333,7 +348,7 @@ function handleSubscribe(req, res, url) {
     const user = db.prepare('SELECT * FROM users WHERE sub_token = ?').get(linkMatch[1]);
     if (!user) return sendRaw(res, 404, 'text/plain; charset=utf-8', 'not found'), true;
     if (!L.isActive(user)) return sendRaw(res, 403, 'text/plain; charset=utf-8', sub.unavailableReason(user)), true;
-    const node = db.prepare('SELECT * FROM nodes WHERE id = ? AND enabled = 1').get(Number(linkMatch[2]));
+    const node = sub.activeNodes(user.id).find((n) => n.id === Number(linkMatch[2]));
     if (!node) return sendRaw(res, 404, 'text/plain; charset=utf-8', 'node not found'), true;
     const link = L.isVless(node) ? L.vlessLink(user, node) : L.hysteria2Link(user, node);
     return sendRaw(res, 200, 'text/plain; charset=utf-8', link), true;

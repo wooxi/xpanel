@@ -413,18 +413,18 @@ async function handle(req, res, url) {
         str(d.name) || row.name,
         str(d.host, 200) || row.host,
         int(d.port, row.port),
-        str(d.sni, 200),
-        d.insecure ? 1 : 0,
+        d.sni === undefined ? row.sni : str(d.sni, 200),
+        d.insecure === undefined ? row.insecure : (d.insecure ? 1 : 0),
         hy2.obfs,
         hy2.password,
-        int(d.up_mbps),
-        int(d.down_mbps),
-        str(d.port_hopping, 100),
+        d.up_mbps === undefined ? row.up_mbps : int(d.up_mbps),
+        d.down_mbps === undefined ? row.down_mbps : int(d.down_mbps),
+        d.port_hopping === undefined ? row.port_hopping : str(d.port_hopping, 100),
         f.protocol, f.flow, f.network, f.ws_path, f.ws_host, f.tls_mode,
         f.reality_dest, f.reality_server_names, f.reality_private_key, f.reality_public_key, f.reality_short_ids,
         f.cert_path, f.key_path,
-        d.enabled === false ? 0 : 1,
-        int(d.sort),
+        d.enabled === undefined ? row.enabled : (d.enabled ? 1 : 0),
+        d.sort === undefined ? row.sort : int(d.sort),
         id
       );
       return json(res, 200, { ok: true }), true;
@@ -474,7 +474,12 @@ async function handle(req, res, url) {
     const d = await body(req);
     const name = str(d.name) || '未命名';
     const limitGb = d.traffic_limit_gb;
-    const trafficLimit = limitGb === '' || limitGb == null ? null : Math.round(Number(limitGb) * L.GB);
+    let trafficLimit = null;
+    if (limitGb !== '' && limitGb != null) {
+      const n = Number(limitGb);
+      if (!Number.isFinite(n) || n < 0) return json(res, 400, { error: '流量额度必须为非负数字' }), true;
+      trafficLimit = Math.round(n * L.GB);
+    }
     const uuid = L.uuid();
     const subToken = L.randomToken(12);
     const info = db
@@ -497,7 +502,12 @@ async function handle(req, res, url) {
     if (req.method === 'PUT') {
       const d = await body(req);
       const limitGb = d.traffic_limit_gb;
-      const trafficLimit = limitGb === '' || limitGb == null ? null : Math.round(Number(limitGb) * L.GB);
+      let trafficLimit = null;
+      if (limitGb !== '' && limitGb != null) {
+        const n = Number(limitGb);
+        if (!Number.isFinite(n) || n < 0) return json(res, 400, { error: '流量额度必须为非负数字' }), true;
+        trafficLimit = Math.round(n * L.GB);
+      }
       db.prepare(
         `UPDATE users SET name = ?, expires_at = ?, traffic_limit = ?, speed_limit = ?, device_limit = ?, banned = ? WHERE id = ?`
       ).run(
@@ -522,15 +532,34 @@ async function handle(req, res, url) {
 
   const resetTraffic = path.match(/^\/api\/users\/(\d+)\/reset-traffic$/);
   if (resetTraffic && req.method === 'POST') {
-    db.prepare('UPDATE users SET up = 0, down = 0 WHERE id = ?').run(Number(resetTraffic[1]));
+    const id = Number(resetTraffic[1]);
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) {
+      return json(res, 404, { error: '用户不存在' }), true;
+    }
+    db.prepare('UPDATE users SET up = 0, down = 0 WHERE id = ?').run(id);
     return json(res, 200, { ok: true }), true;
   }
 
   const resetSub = path.match(/^\/api\/users\/(\d+)\/reset-sub$/);
   if (resetSub && req.method === 'POST') {
     const id = Number(resetSub[1]);
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) {
+      return json(res, 404, { error: '用户不存在' }), true;
+    }
     const token = L.randomToken(12);
     db.prepare('UPDATE users SET sub_token = ? WHERE id = ?').run(token, id);
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    return json(res, 200, userView(req, row)), true;
+  }
+
+  const resetUuid = path.match(/^\/api\/users\/(\d+)\/reset-uuid$/);
+  if (resetUuid && req.method === 'POST') {
+    const id = Number(resetUuid[1]);
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) {
+      return json(res, 404, { error: '用户不存在' }), true;
+    }
+    const newUuid = L.uuid();
+    db.prepare('UPDATE users SET uuid = ? WHERE id = ?').run(newUuid, id);
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     return json(res, 200, userView(req, row)), true;
   }
